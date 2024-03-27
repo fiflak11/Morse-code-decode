@@ -1,6 +1,5 @@
 #include <LiquidCrystal.h>
-LiquidCrystal lcd(2, 3, 4, 5, 6, 7);
-String morseCode(String code){
+String morseCode(String code){ //transform dots and dashes to letters
   if(code=="._")
     return "A";
   if(code=="_...")
@@ -55,35 +54,47 @@ String morseCode(String code){
     return "Z";
   return "";
 }
+
+String display="", currentLetter=""; //dispaly is letters that we show on LCE, currentLetter stores dots and dashes
+int shortSignal = 0; //how long "short" signal(.) should be (lower than 3*shortSignal is interpreta as short signal)
+bool run = false; //it is for check if we start to send light signal
+int line = 0; //it is boundries where we interprete signal as high/low
+int one = 0,zero = 0;  //counters (how long signal is high/low)
+int lightB = 0,light = 0; //light - current light intensity, lightB stores the previous value from light (to compare is light intesity getting bigger/lower)
+
+LiquidCrystal lcd(2, 3, 4, 5, 6, 7); //16x2 display
 void setup(){
   Serial.begin(1200); 
   lcd.begin(16, 2);
   lcd.setCursor(0, 0);
+  line = analogRead(A5); // A5 get information about light intensity (0-1000), line shouldn't be close to boundaries so i limited it(300-700)
+  if(line>700)
+    line=700;
+  else if(line<300)
+    line=300;
 }
-String display="", currentLetter="";
-int shortSignal = 6000; 
-bool run = true;
-int bound = 500;
-int one = 0,zero = 0;  //counters
-int lightB = 0,light = 0; 
+
 void loop() {
-  if(!run){
+  if(!run){ //waiting here to first light signal
     light = analogRead(A5);
-    if(light>=bound)
+    if(light>=line) 
       one+=1;
     else{
       shortSignal=one;
       one=0;
     }
-    if(shortSignal>0 && one==0){
+    if(shortSignal>0 && one>1000){ //if light signal has ended we set short signal (4000-6000) and start gathering information
       run=true;
-      Serial.println(shortSignal);
-    }
+      if(shortSignal>6000)
+        shortSignal=6000;
+      else if(shortSignal<4000)
+        shortSignal=4000;
+    } 
   }
   else{
     lightB=light;
     light = analogRead(A5);
-    if(lightB>=bound){
+    if(lightB>=line){
       one+=1;
       zero=0;
     }
@@ -91,21 +102,17 @@ void loop() {
       one=0;
       zero+=1;
     }
-    if(lightB>=bound && light<bound){ //LIGHT CHANGE
-      if(one){
-        if(one<3*shortSignal && one>2500)
+    if(lightB>=line && light<line){ //LIGHT INSTENSITY CHANGEhg
+        if(one<3*shortSignal && one>2500) //short signal(.), one>shortSignal/2 this condition is for not to interpret very short light signal as dot
           currentLetter+=".";
-        else if(one>2500)
+        else if(one>2500) //long signal(_)
           currentLetter+="_";
-        Serial.println(currentLetter);
-      }
     }
-    if(zero>3*shortSignal){
+    if(zero>3*shortSignal){ //if we get long low signal we tranform "currentLetter" into real letter and add it to dispaly and start to "write" new letter
       display+=morseCode(currentLetter);
-      //lcd.clear();
+      lcd.clear();
       lcd.setCursor(0, 0);
       lcd.print(display);
-      Serial.println(display);
       currentLetter="";
       zero=0;
     }
