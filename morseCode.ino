@@ -65,6 +65,9 @@ int lightB = 0,light = 0; //light - current light intensity, lightB stores the p
 LiquidCrystal lcd(2, 3, 4, 5, 6, 7); //16x2 display
 void setup(){
   Serial.begin(1200); 
+  pinMode(8, OUTPUT); //"run" diode HIGH IF RUN IS TRUE
+  pinMode(12, OUTPUT); //"shortSignal" diode HIGH AS LONG AS LENGTH OF LIGHT SINGAL IS INTERPRETE AS SHORT
+  pinMode(13, OUTPUT); //"longSingal" diode HIGH AS LONG AS LENGTH OF LIGHT SINGAL IS INTERPRETE AS LONG
   lcd.begin(16, 2);
   lcd.setCursor(0, 0);
   line = analogRead(A5); // A5 get information about light intensity (0-1000), line shouldn't be close to boundaries so i limited it(300-700)
@@ -76,36 +79,47 @@ void setup(){
 
 void loop() {
   if(!run){ //waiting here to first light signal
+    digitalWrite(8,LOW);
     light = analogRead(A5);
-    if(light>=line) 
+    if(light>=line)
       one+=1;
     else{
       shortSignal=one;
       one=0;
     }
-    if(shortSignal>0 && one>1000){ //if light signal has ended we set short signal (4000-6000) and start gathering information
+    if(shortSignal>0 && one>0){ //if light signal has ended we set short signal (4000-6000) and start gathering information
       run=true;
       if(shortSignal>6000)
-        shortSignal=6000;
+        shortSignal=4000;
       else if(shortSignal<4000)
         shortSignal=4000;
+      Serial.println(shortSignal);
     } 
   }
   else{
+    digitalWrite(8,HIGH);
     lightB=light;
     light = analogRead(A5);
     if(lightB>=line){
       one+=1;
       zero=0;
+      if(one<3*shortSignal && one>shortSignal)
+        digitalWrite(12,HIGH);
+      else if(one>3*shortSignal){
+        digitalWrite(13,HIGH);
+        digitalWrite(12,LOW);
+      }
     }
     else{
       one=0;
       zero+=1;
+      digitalWrite(12,LOW);
+      digitalWrite(13,LOW);
     }
     if(lightB>=line && light<line){ //LIGHT INSTENSITY CHANGEhg
-        if(one<3*shortSignal && one>2500) //short signal(.), one>shortSignal/2 this condition is for not to interpret very short light signal as dot
+        if(one<3*shortSignal && one>shortSignal) //short signal(.), one>shortSignal/2 this condition is for not to interpret very short light signal as dot
           currentLetter+=".";
-        else if(one>2500) //long signal(_)
+        else if(one>shortSignal) //long signal(_)
           currentLetter+="_";
     }
     if(zero>3*shortSignal){ //if we get long low signal we tranform "currentLetter" into real letter and add it to dispaly and start to "write" new letter
