@@ -56,10 +56,10 @@ String morseCode(String code){ //transform dots and dashes to letters
 }
 
 String display="", currentLetter=""; //dispaly is letters that we show on LCE, currentLetter stores dots and dashes
-int shortSignal = 0; //how long "short" signal(.) should be (lower than 3*shortSignal is interpreta as short signal)
+long shortSignal = 0; //how long "short" signal(.) should be (lower than 3*shortSignal is interpreta as short signal)
 bool run = false; //it is for check if we start to send light signal
 int line = 0; //it is boundries where we interprete signal as high/low
-int one = 0,zero = 0;  //counters (how long signal is high/low)
+long one = 0,zero = 0;  //counters (how long signal is high/low)
 int lightB = 0,light = 0; //light - current light intensity, lightB stores the previous value from light (to compare is light intesity getting bigger/lower)
 
 LiquidCrystal lcd(2, 3, 4, 5, 6, 7); //16x2 display
@@ -87,13 +87,13 @@ void loop() {
       shortSignal=one;
       one=0;
     }
-    if(shortSignal>0 && one>0){ //if light signal has ended we set short signal (4000-6000) and start gathering information
+    if(shortSignal>50){ //if light signal has ended we set short signal (4000-6000) and start gathering information
       run=true;
-      if(shortSignal>6000)
-        shortSignal=4000;
+      if(shortSignal>5000)
+        shortSignal=5000;
       else if(shortSignal<4000)
         shortSignal=4000;
-      Serial.println(shortSignal);
+      //Serial.println(shortSignal);
     } 
   }
   else{
@@ -105,7 +105,7 @@ void loop() {
       zero=0;
       if(one<3*shortSignal && one>shortSignal)
         digitalWrite(12,HIGH);
-      else if(one>3*shortSignal){
+      else if(one>3*shortSignal && one<10*shortSignal){
         digitalWrite(13,HIGH);
         digitalWrite(12,LOW);
       }
@@ -116,19 +116,26 @@ void loop() {
       digitalWrite(12,LOW);
       digitalWrite(13,LOW);
     }
-    if(lightB>=line && light<line){ //LIGHT INSTENSITY CHANGEhg
+    if(lightB>=line && light<line){ //LIGHT INSTENSITY CHANGE
         if(one<3*shortSignal && one>shortSignal) //short signal(.), one>shortSignal/2 this condition is for not to interpret very short light signal as dot
           currentLetter+=".";
-        else if(one>shortSignal) //long signal(_)
+        else if(one>3*shortSignal && one<10*shortSignal) //long signal(_)
           currentLetter+="_";
     }
-    if(zero>3*shortSignal){ //if we get long low signal we tranform "currentLetter" into real letter and add it to dispaly and start to "write" new letter
+    if(zero==3*shortSignal){ //if we get long low signal we tranform "currentLetter" into real letter and add it to dispaly and start to "write" new letter
       display+=morseCode(currentLetter);
       lcd.clear();
       lcd.setCursor(0, 0);
       lcd.print(display);
       currentLetter="";
-      zero=0;
+    }
+    if(zero==7*shortSignal && display.length()-1!=display.lastIndexOf(" ")){
+      digitalWrite(13,HIGH);
+      digitalWrite(12,HIGH);
+      delay(50);
+      digitalWrite(13,LOW);
+      digitalWrite(12,LOW);
+      display+=" ";
     }
   }
 }
